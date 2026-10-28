@@ -18,11 +18,28 @@ STATE_DIR = Path(__file__).parent / "state"
 # 通知する受付方式（抽選は対象外）
 NOTIFY_TYPES = {"先着"}
 # イベント名か受付名にこれらを含むものは通知しない
-EXCLUDE_KEYWORDS = ("当日券", "撮影会", "トークショー")
+EXCLUDE_KEYWORDS = (
+    "当日券",
+    "撮影会",
+    "トークショー",
+    "公開授業",
+    "クラウドファンディング",
+    "パッケージ",
+    "生誕パック",
+    "一日店長",
+    "CLUB「ナイトフィーバー」リバイバル",
+    "里菜と池田のイケティるTV",
+    "オフ会",
+)
+# イベント名にこれらを含むものは通知しない（受付名は見ない）
+# 「事前予約」はライブの受付名にも使われるため、イベント名だけで判定する
+EXCLUDE_TITLE_KEYWORDS = ("事前予約",)
 
 
 def should_notify(sale: dict) -> bool:
     if sale.get("type") not in NOTIFY_TYPES:
+        return False
+    if any(k in sale["title"] for k in EXCLUDE_TITLE_KEYWORDS):
         return False
     text = f"{sale['title']} {sale['ticket_name']}"
     return not any(k in text for k in EXCLUDE_KEYWORDS)
