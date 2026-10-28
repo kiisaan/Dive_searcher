@@ -19,20 +19,18 @@ STATE_DIR = Path(__file__).parent / "state"
 NOTIFY_TYPES = {"先着"}
 
 
-def group_by_event(sales: list[dict]) -> list[dict]:
-    """同じイベントの受付をまとめ、受付開始の早い順に並べる。"""
-    events: dict[str, dict] = {}
-    for s in sorted(sales, key=lambda s: s["start"]):
-        event = events.setdefault(s["url"], {**s, "starts": []})
-        if s["start"] not in event["starts"]:
-            event["starts"].append(s["start"])
-    return sorted(events.values(), key=lambda e: (e["starts"][0], e["title"]))
+SEPARATOR = "-------------------------------"
 
 
-def event_line(event: dict) -> str:
-    """1イベントを「イベント名 / 発売時間 / ページリンク」の1行にする。"""
-    times = "・".join(f"{t:%H:%M}" for t in event["starts"])
-    return f"{event['title']} / {times} / {event['url']}"
+def build_sections(sales: list[dict]) -> list[str]:
+    """発売時間（時）ごとに「イベント名:URL」を並べたブロックを作る。"""
+    by_hour: dict[int, dict[str, str]] = {}
+    for s in sorted(sales, key=lambda s: (s["start"], s["title"])):
+        by_hour.setdefault(s["start"].hour, {}).setdefault(s["url"], s["title"])
+    return [
+        "\n".join([f"{hour}時", *(f"{title}:{url}" for url, title in events.items())])
+        for hour, events in by_hour.items()
+    ]
 
 
 def main() -> int:
@@ -49,24 +47,22 @@ def main() -> int:
         except Exception as e:  # 片方のサイトが落ちても他方は通知する
             errors.append(f"{name}: {e!r}")
 
-    events = group_by_event([s for s in sales if s.get("type") in NOTIFY_TYPES])
-    header = f"{today:%Y/%m/%d} に先着販売が始まるチケット：{len(events)}件"
+    sections = build_sections([s for s in sales if s.get("type") in NOTIFY_TYPES])
+    header = f"{today:%m/%d}チケットダイブのチケ発\n"
     if errors:
-        header += "\n⚠️ 取得に失敗したサイトがあります: " + " / ".join(errors)
-    if not events:
-        header += "\n本日販売開始の先着チケットは見つかりませんでした。"
+        header += "\n⚠️ 取得に失敗しました: " + " / ".join(errors)
+    if not sections:
+        header += "\n本日発売の先着チケットは見つかりませんでした。"
 
     if dry_run:
-        print(header)
-        for e in events:
-            print(event_line(e))
+        print(discord.join(header, sections, SEPARATOR))
     else:
         send_at = datetime.now(JST).replace(hour=SEND_AT[0], minute=SEND_AT[1], second=0, microsecond=0)
         wait = (send_at - datetime.now(JST)).total_seconds()
         if 0 < wait < 3 * 3600:
             time.sleep(wait)
-        discord.send(webhook_url, header, [event_line(e) for e in events])
-    return 1 if errors and not events else 0
+        discord.send(webhook_url, header, sections, SEPARATOR)
+    return 1 if errors and not sections else 0
 
 
 if __name__ == "__main__":
