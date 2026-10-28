@@ -50,7 +50,7 @@ def main() -> int:
             errors.append(f"{name}: {e!r}")
 
     events = group_by_event([s for s in sales if s.get("type") in NOTIFY_TYPES])
-    header = f"**{today:%Y/%m/%d} に先着販売が始まるチケット：{len(events)}件**"
+    header = f"{today:%Y/%m/%d} に先着販売が始まるチケット：{len(events)}件"
     if errors:
         header += "\n⚠️ 取得に失敗したサイトがあります: " + " / ".join(errors)
     if not events:

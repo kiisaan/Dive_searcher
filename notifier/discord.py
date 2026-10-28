@@ -3,9 +3,10 @@ import time
 import urllib.error
 import urllib.request
 
-# Discord の制限: embed の説明文は 4096 文字まで、1メッセージの embed 合計は 6000 文字まで
-DESCRIPTION_LIMIT = 4000
-EMBED_COLOR = 0x2B6CB0
+# Discord の制限: メッセージ本文は 2000 文字まで
+CONTENT_LIMIT = 2000
+# URL のプレビュー（自動 embed）を出さない
+SUPPRESS_EMBEDS = 1 << 2
 
 
 def _post(webhook_url: str, payload: dict) -> None:
@@ -37,12 +38,15 @@ def _pack(lines: list[str], limit: int) -> list[str]:
 
 
 def send(webhook_url: str, header: str, lines: list[str]) -> None:
-    """header を本文に、lines を embed の説明文に詰めて送る（1メッセージ1 embed）。"""
-    for i, block in enumerate(_pack(lines, DESCRIPTION_LIMIT) if lines else [""]):
-        payload: dict = {}
-        if block:
-            payload["embeds"] = [{"description": block, "color": EMBED_COLOR}]
-        if i == 0:
-            payload["content"] = header
-        _post(webhook_url, payload)
+    """header と lines を本文として送る。スマホでもコピーしやすいよう embed は使わない。"""
+    for block in _pack([header, *lines], CONTENT_LIMIT):
+        _post(
+            webhook_url,
+            {
+                "content": block,
+                "flags": SUPPRESS_EMBEDS,
+                # イベント名に @everyone などが含まれていてもメンションしない
+                "allowed_mentions": {"parse": []},
+            },
+        )
         time.sleep(1)
