@@ -6,11 +6,14 @@
 10/28チケットダイブのチケ発
 
 20時
-イベント名:URL
-イベント名:URL
+イベント名:○○
+URL:https://ticketdive.com/event/...
+イベント名:○○
+URL:https://ticketdive.com/event/...
 -------------------------------
 21時
-イベント名:URL
+イベント名:○○
+URL:https://ticketdive.com/event/...
 ```
 
 2000 文字を超える場合は時間帯の区切りで複数メッセージに分けて送ります。
