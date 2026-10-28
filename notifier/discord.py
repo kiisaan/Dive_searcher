@@ -39,7 +39,8 @@ def _split(text: str, limit: int) -> list[str]:
 
 
 def join(header: str, sections: list[str], separator: str) -> str:
-    return header + ("\n" + f"\n{separator}\n".join(sections) if sections else "")
+    # 区切り線の前には空行を入れる
+    return header + ("\n" + f"\n\n{separator}\n".join(sections) if sections else "")
 
 
 def _messages(header: str, sections: list[str], separator: str, limit: int) -> list[str]:
@@ -47,8 +48,10 @@ def _messages(header: str, sections: list[str], separator: str, limit: int) -> l
     messages = [header]
     for i, section in enumerate(sections):
         piece = section if i == 0 else f"{separator}\n{section}"
-        if len(messages[-1]) + 1 + len(piece) <= limit:
-            messages[-1] += "\n" + piece
+        # 区切り線の前には空行を入れる
+        glue = "\n" if i == 0 else "\n\n"
+        if len(messages[-1]) + len(glue) + len(piece) <= limit:
+            messages[-1] += glue + piece
         elif len(piece) <= limit:
             messages.append(piece)
         else:
