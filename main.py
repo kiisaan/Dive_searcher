@@ -23,12 +23,12 @@ SEPARATOR = "-------------------------------"
 
 
 def build_sections(sales: list[dict]) -> list[str]:
-    """発売時間（時）ごとに「イベント名:」「URL:」の2行ずつ並べたブロックを作る。"""
+    """発売時間（時）ごとに「イベント名:」「URL:」の2行セットを空行区切りで並べたブロックを作る。"""
     by_hour: dict[int, dict[str, str]] = {}
     for s in sorted(sales, key=lambda s: (s["start"], s["title"])):
         by_hour.setdefault(s["start"].hour, {}).setdefault(s["url"], s["title"])
     return [
-        "\n".join([f"{hour}時", *(f"イベント名:{title}\nURL:{url}" for url, title in events.items())])
+        f"{hour}時\n" + "\n\n".join(f"イベント名:{title}\nURL:{url}" for url, title in events.items())
         for hour, events in by_hour.items()
     ]
 
