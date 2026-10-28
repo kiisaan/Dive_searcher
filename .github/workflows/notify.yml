@@ -1,0 +1,34 @@
+name: 本日発売チケット通知
+
+on:
+  schedule:
+    # 6:13 JST (= 前日 21:13 UTC) に起動して収集し（30〜60分）、8:00 JST まで待って送信する。
+    # GitHub 側の混雑で起動が遅れることがあるため余裕を持たせている
+    - cron: "13 21 * * *"
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 前回の受付情報キャッシュを復元
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: state-${{ github.run_id }}
+          restore-keys: state-
+      - name: 通知
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python main.py
+      - name: 受付情報キャッシュを保存
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: state-${{ github.run_id }}
