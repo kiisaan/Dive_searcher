@@ -23,8 +23,7 @@ JST = timezone(timedelta(hours=9))
 
 RECEPTION_TYPES = {
     "lottery": "抽選",
-    "firstCome": "先着",
-    "firstComeFirstServed": "先着",
+    "first": "先着",
 }
 
 # 1文字の検索でも部分一致で20件返るので、文字種を広く使って取りこぼしを減らす

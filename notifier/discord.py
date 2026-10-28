@@ -3,8 +3,9 @@ import time
 import urllib.error
 import urllib.request
 
-# Discord の制限: 1メッセージあたり embed 10個まで
-EMBEDS_PER_MESSAGE = 10
+# Discord の制限: embed の説明文は 4096 文字まで、1メッセージの embed 合計は 6000 文字まで
+DESCRIPTION_LIMIT = 4000
+EMBED_COLOR = 0x2B6CB0
 
 
 def _post(webhook_url: str, payload: dict) -> None:
@@ -25,12 +26,22 @@ def _post(webhook_url: str, payload: dict) -> None:
             time.sleep(float(retry_after) + 0.5)
 
 
-def send(webhook_url: str, header: str, embeds: list[dict]) -> None:
-    if not embeds:
-        _post(webhook_url, {"content": header})
-        return
-    for i in range(0, len(embeds), EMBEDS_PER_MESSAGE):
-        payload = {"embeds": embeds[i : i + EMBEDS_PER_MESSAGE]}
+def _pack(lines: list[str], limit: int) -> list[str]:
+    blocks = [""]
+    for line in lines:
+        line = line[:limit]
+        if blocks[-1] and len(blocks[-1]) + 1 + len(line) > limit:
+            blocks.append("")
+        blocks[-1] = f"{blocks[-1]}\n{line}" if blocks[-1] else line
+    return blocks
+
+
+def send(webhook_url: str, header: str, lines: list[str]) -> None:
+    """header を本文に、lines を embed の説明文に詰めて送る（1メッセージ1 embed）。"""
+    for i, block in enumerate(_pack(lines, DESCRIPTION_LIMIT) if lines else [""]):
+        payload: dict = {}
+        if block:
+            payload["embeds"] = [{"description": block, "color": EMBED_COLOR}]
         if i == 0:
             payload["content"] = header
         _post(webhook_url, payload)

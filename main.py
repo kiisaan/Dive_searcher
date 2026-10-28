@@ -15,21 +15,33 @@ SEND_AT = (8, 0)
 STATE_DIR = Path(__file__).parent / "state"
 
 
-def to_embed(sale: dict) -> dict:
-    fields = [{"name": "受付開始", "value": sale["start"].strftime("%H:%M"), "inline": True}]
-    if sale.get("type"):
-        fields.append({"name": "受付方式", "value": sale["type"], "inline": True})
-    if sale.get("event_date"):
-        fields.append({"name": "公演日", "value": sale["event_date"].strftime("%Y/%m/%d"), "inline": True})
-    if sale.get("venue"):
-        fields.append({"name": "会場", "value": sale["venue"][:1024], "inline": True})
-    return {
-        "title": sale["title"][:256],
-        "url": sale["url"],
-        "description": sale["ticket_name"][:4096],
-        "fields": fields,
-        "footer": {"text": sale["source"]},
-    }
+def group_by_event(sales: list[dict]) -> list[dict]:
+    """同じイベントの受付を1つにまとめ、受付開始の早い順に並べる。"""
+    events: dict[str, dict] = {}
+    for s in sorted(sales, key=lambda s: (s["start"], s["ticket_name"])):
+        event = events.setdefault(s["url"], {**s, "tickets": []})
+        ticket = (s["start"], s["ticket_name"], s.get("type"))
+        if ticket not in event["tickets"]:
+            event["tickets"].append(ticket)
+    return sorted(events.values(), key=lambda e: (e["tickets"][0][0], e["title"]))
+
+
+def ticket_label(ticket: tuple) -> str:
+    _, name, type_ = ticket
+    return name + (f"（{type_}）" if type_ else "")
+
+
+def event_line(event: dict) -> str:
+    """1公演を1行にする。例: `20:00` [タイトル](URL) 一般販売（先着） ｜ 11/28 会場"""
+    title = event["title"].replace("[", "［").replace("]", "］")
+    starts = sorted({t[0] for t in event["tickets"]})
+    time_label = f"{starts[0]:%H:%M}" + ("〜" if len(starts) > 1 else "")
+    tickets = " / ".join(dict.fromkeys(ticket_label(t) for t in event["tickets"]))
+    if len(tickets) > 120:
+        tickets = tickets[:120] + "…"
+    line = f"`{time_label}` [{title}]({event['url']}) {tickets}"
+    detail = " ".join(x for x in [event["event_date"].strftime("%-m/%-d") if event.get("event_date") else "", event.get("venue") or ""] if x)
+    return line + (f" ｜ {detail}" if detail else "")
 
 
 def main() -> int:
@@ -46,24 +58,23 @@ def main() -> int:
         except Exception as e:  # 片方のサイトが落ちても他方は通知する
             errors.append(f"{name}: {e!r}")
 
-    sales.sort(key=lambda s: (s["start"], s["title"]))
-    header = f"**{today:%Y/%m/%d} に受付開始のチケット：{len(sales)}件**"
+    events = group_by_event(sales)
+    header = f"**{today:%Y/%m/%d} に受付開始のチケット：{len(events)}公演・{sum(len(e['tickets']) for e in events)}受付**"
     if errors:
         header += "\n⚠️ 取得に失敗したサイトがあります: " + " / ".join(errors)
     if not sales:
         header += "\n本日受付開始のチケットは見つかりませんでした。"
 
-    embeds = [to_embed(s) for s in sales]
     if dry_run:
         print(header)
-        for s in sales:
-            print(f"{s['start']:%H:%M} [{s['source']}] {s['title']} / {s['ticket_name']} ({s.get('type') or '-'}) {s['url']}")
+        for e in events:
+            print(event_line(e))
     else:
         send_at = datetime.now(JST).replace(hour=SEND_AT[0], minute=SEND_AT[1], second=0, microsecond=0)
         wait = (send_at - datetime.now(JST)).total_seconds()
         if 0 < wait < 3 * 3600:
             time.sleep(wait)
-        discord.send(webhook_url, header, embeds)
+        discord.send(webhook_url, header, [event_line(e) for e in events])
     return 1 if errors and not sales else 0
 
 
