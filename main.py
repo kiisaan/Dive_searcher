@@ -17,6 +17,15 @@ STATE_DIR = Path(__file__).parent / "state"
 
 # 通知する受付方式（抽選は対象外）
 NOTIFY_TYPES = {"先着"}
+# イベント名か受付名にこれらを含むものは通知しない
+EXCLUDE_KEYWORDS = ("当日券", "撮影会", "トークショー")
+
+
+def should_notify(sale: dict) -> bool:
+    if sale.get("type") not in NOTIFY_TYPES:
+        return False
+    text = f"{sale['title']} {sale['ticket_name']}"
+    return not any(k in text for k in EXCLUDE_KEYWORDS)
 
 
 SEPARATOR = "-------------------------------"
@@ -47,7 +56,7 @@ def main() -> int:
         except Exception as e:  # 片方のサイトが落ちても他方は通知する
             errors.append(f"{name}: {e!r}")
 
-    sections = build_sections([s for s in sales if s.get("type") in NOTIFY_TYPES])
+    sections = build_sections([s for s in sales if should_notify(s)])
     header = f"{today:%m/%d}チケットダイブのチケ発\n"
     if errors:
         header += "\n⚠️ 取得に失敗しました: " + " / ".join(errors)
