@@ -17,6 +17,10 @@ jobs:
         source: [ticketdive, livepocket]
     runs-on: ubuntu-latest
     timeout-minutes: 300
+    # 同じサイトの実行が重なって保存データを同時に書き換えないよう、順番に動かす
+    concurrency:
+      group: state-${{ matrix.source }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
