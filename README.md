@@ -71,6 +71,16 @@ TicketDive には全イベント一覧がなく、検索は 1 回最大 20 件�
 - 検索に引っかからないイベントは取りこぼす可能性があります
 - 8:00 以降に公開され、同じ日に受付開始する受付は通知できません
 
+### サーバー（Oracle Cloud 東京リージョン）
+LivePocket が日本国外からのアクセスを受け付けないため、Oracle Cloud の Always Free（東京）の
+サーバーで動かす準備をしています。設定手順は [docs/oracle-setup.md](docs/oracle-setup.md)。
+
+- `server/cloud-init.sh`: インスタンス作成時に貼り付ける初期化スクリプト
+- `server/install.sh`: タイムゾーン・自動更新・cron の設定（更新されると自動で再実行）
+- `server/sync.sh`: 10 分ごとに main を取り込み、新しい `probes/*.sh`（調査用）を実行して結果を `probe-results` ブランチへ書き戻す
+- `server/run_daily.sh`: 毎朝 6:45 に収集して 8:00 に送信し、実行ログを `probe-results` ブランチへ書き戻す
+  （`server/ENABLE_DAILY` があるときだけ動く。GitHub Actions からの通知と二重にしないため）
+
 ### LivePocket
 クラウド（米国のデータセンター）からのアクセスには
 「不正なリクエストです。サイトへのアクセスは許可できません。」と 403 が返るため、
