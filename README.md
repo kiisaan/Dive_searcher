@@ -89,3 +89,6 @@ TicketDive には全イベント一覧がなく、検索は 1 回最大 20 件�
 - 受付情報は `state/livepocket.json` に保存して使い回す。詳細ページを取り直すのは、新しいイベント・販売状態が変わったもの・
   今日明日に受付が始まるもの・保存から日数が経ったもの（販売前は 3 日、それ以外は 7 日）
 - 1 回の詳細ページ取得は最大 2,500 件。イベントが約 9,000 件あるため、初回から数日は受付情報がそろわず取りこぼしがあります
+
+GitHub Actions（米国の Azure）からは AWS WAF のボット確認（HTTP 202・`x-amzn-waf-action: challenge`）がかかって取得できないため、
+Google Cloud（東京）から取得できるか確認中です。設定手順は [docs/gcp-setup.md](docs/gcp-setup.md)。
