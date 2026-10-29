@@ -2,16 +2,16 @@ name: 本日発売チケット通知
 
 on:
   schedule:
-    # 2:43 JST (= 前日 17:43 UTC) に起動して収集し（30〜60分）、8:00 JST まで待って送信する。
-    # GitHub のスケジュール実行は数時間遅れることがあるため大きく前倒ししている。
-    # 待ち時間を含めてもジョブの上限 6 時間に収まるよう、起動はこれより早めない
-    - cron: "43 17 * * *"
+    # 5:07 JST (= 前日 20:07 UTC) に起動して収集し（30〜60分）、8:00 JST まで待って送信する。
+    # GitHub のスケジュール実行は遅れることがあるため前倒ししている。
+    # 毎時 0 分は混雑して遅れやすいので少しずらしている
+    - cron: "7 20 * * *"
   workflow_dispatch:
 
 jobs:
   notify:
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
