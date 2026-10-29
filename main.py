@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from notifier import discord, ticketdive
+from notifier import discord, livepocket, ticketdive
 
 JST = timezone(timedelta(hours=9))
 # 収集に時間がかかるので早めに起動し、この時刻まで待ってから送信する
@@ -60,26 +60,35 @@ def build_messages(sales: list[dict]) -> list[str]:
     return messages
 
 
+# 実行するサイト: 名前 → (投稿タイトルに使う名前, 収集関数)
+SOURCES = {
+    "ticketdive": ("チケットダイブ", lambda d: ticketdive.collect(d, cache_path=STATE_DIR / "ticketdive.json")),
+    "livepocket": ("ライブポケット", lambda d: livepocket.collect(d, cache_path=STATE_DIR / "livepocket.json")),
+}
+
+
 def main() -> int:
+    """使い方: python main.py <ticketdive|livepocket> [--dry-run]"""
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    source = args[0] if args else "ticketdive"
+    label, collect = SOURCES[source]
     webhook_url = os.environ.get("DISCORD_WEBHOOK_URL")
     dry_run = "--dry-run" in sys.argv or not webhook_url
     today = datetime.now(JST).date()
 
-    sales = []
-    errors = []
-    sources = [("TicketDive", lambda d: ticketdive.collect(d, cache_path=STATE_DIR / "ticketdive.json"))]
-    for name, collect in sources:
-        try:
-            sales.extend(collect(today))
-        except Exception as e:  # 片方のサイトが落ちても他方は通知する
-            errors.append(f"{name}: {e!r}")
+    error = None
+    try:
+        sales = collect(today)
+    except Exception as e:  # 取得に失敗しても、その旨を通知する
+        sales = []
+        error = repr(e)
 
     messages = build_messages([s for s in sales if should_notify(s)])
-    title = f"{today:%m/%d}チケットダイブのチケ発"
+    title = f"{today:%m/%d}{label}のチケ発"
     count = sum(1 for m in messages if m.startswith("イベント名:"))
     header = f"{title}\n\n先着販売 {count}件"
-    if errors:
-        header += "\n⚠️ 取得に失敗しました: " + " / ".join(errors)
+    if error:
+        header += f"\n⚠️ 取得に失敗しました: {error}"
     if not messages:
         header += "\n本日発売の先着チケットは見つかりませんでした。"
 
@@ -91,7 +100,7 @@ def main() -> int:
         if 0 < wait < 6 * 3600:
             time.sleep(wait)
         discord.send_forum_post(webhook_url, title, [header, *messages])
-    return 1 if errors and not messages else 0
+    return 1 if error else 0
 
 
 if __name__ == "__main__":

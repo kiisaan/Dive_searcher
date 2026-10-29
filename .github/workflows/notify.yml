@@ -2,7 +2,7 @@ name: 本日発売チケット通知
 
 on:
   schedule:
-    # 5:07 JST (= 前日 20:07 UTC) に起動して収集し（30〜60分）、8:00 JST まで待って送信する。
+    # 5:07 JST (= 前日 20:07 UTC) に起動して収集し（30〜90分）、8:00 JST まで待って送信する。
     # GitHub のスケジュール実行は遅れることがあるため前倒ししている。
     # 毎時 0 分は混雑して遅れやすいので少しずらしている
     - cron: "7 20 * * *"
@@ -10,6 +10,11 @@ on:
 
 jobs:
   notify:
+    # サイトごとに並行して動かし、それぞれフォーラムに投稿する
+    strategy:
+      fail-fast: false
+      matrix:
+        source: [ticketdive, livepocket]
     runs-on: ubuntu-latest
     timeout-minutes: 300
     steps:
@@ -21,15 +26,15 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: state
-          key: state-${{ github.run_id }}
-          restore-keys: state-
+          key: state-${{ matrix.source }}-${{ github.run_id }}
+          restore-keys: state-${{ matrix.source }}-
       - name: 通知
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python main.py
+        run: python main.py ${{ matrix.source }}
       - name: 受付情報キャッシュを保存
         if: always()
         uses: actions/cache/save@v4
         with:
           path: state
-          key: state-${{ github.run_id }}
+          key: state-${{ matrix.source }}-${{ github.run_id }}
