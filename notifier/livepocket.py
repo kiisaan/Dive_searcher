@@ -67,6 +67,9 @@ def _list_events() -> dict[str, dict]:
                 break
             raise
         if not cards:
+            # 1 ページ目から空なら取得できていない（ボット確認がかかった場合など）。保存データを空で上書きしない
+            if page == 1:
+                raise RuntimeError("LivePocket の検索結果を取得できませんでした")
             break
         for card in cards:
             events.setdefault(card["path"], card)
