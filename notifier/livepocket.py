@@ -9,6 +9,7 @@ import html
 import http.client
 import json
 import re
+import urllib.error
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -56,7 +57,13 @@ def _list_events() -> dict[str, dict]:
     """検索結果を全ページたどって {path: カード情報} を返す。"""
     events: dict[str, dict] = {}
     for page in range(1, MAX_LIST_PAGES + 1):
-        cards = _parse_cards(fetch(f"{BASE}/event/search?sort=1&page={page}"))
+        try:
+            cards = _parse_cards(fetch(f"{BASE}/event/search?sort=1&page={page}"))
+        except urllib.error.HTTPError as e:
+            # 最終ページの次は 404 になる
+            if e.code == 404:
+                break
+            raise
         if not cards:
             break
         for card in cards:
