@@ -85,7 +85,7 @@ def main() -> int:
     else:
         send_at = datetime.now(JST).replace(hour=SEND_AT[0], minute=SEND_AT[1], second=0, microsecond=0)
         wait = (send_at - datetime.now(JST)).total_seconds()
-        if 0 < wait < 3 * 3600:
+        if 0 < wait < 6 * 3600:
             time.sleep(wait)
         discord.send(webhook_url, header, sections, SEPARATOR)
     return 1 if errors and not sections else 0
