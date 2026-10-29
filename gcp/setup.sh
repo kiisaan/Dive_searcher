@@ -48,9 +48,17 @@ gcloud iam workload-identity-pools providers describe "$PROVIDER" --location=glo
     --issuer-uri="https://token.actions.githubusercontent.com" \
     --attribute-mapping="google.subject=assertion.sub,attribute.repository_id=assertion.repository_id,attribute.ref=assertion.ref" \
     --attribute-condition="assertion.repository_id=='$GITHUB_REPO_ID' && assertion.ref=='refs/heads/main'"
-gcloud iam service-accounts add-iam-policy-binding "$DEPLOYER_EMAIL" --quiet \
-  --role=roles/iam.workloadIdentityUser \
-  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL/attribute.repository_id/$GITHUB_REPO_ID" >/dev/null
+# 作成直後の連携設定は反映まで時間がかかり、権限エラーになることがあるので待って再試行する
+for attempt in 1 2 3 4 5 6; do
+  if gcloud iam service-accounts add-iam-policy-binding "$DEPLOYER_EMAIL" --quiet \
+    --role=roles/iam.workloadIdentityUser \
+    --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL/attribute.repository_id/$GITHUB_REPO_ID" >/dev/null; then
+    break
+  fi
+  [ "$attempt" = 6 ] && exit 1
+  echo "反映待ちのため 30 秒後に再試行します（$attempt/5）"
+  sleep 30
+done
 
 cat <<EOF
 
