@@ -1,0 +1,22 @@
+name: LivePocket 接続確認（一時的）
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/debug-livepocket.yml"]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: GitHub Actions からの応答を確認
+        run: |
+          UA="Dive_searcher (+https://github.com/kiisaan/Dive_searcher)"
+          for url in https://livepocket.jp/robots.txt "https://livepocket.jp/event/search?sort=1&page=1"; do
+            echo "== $url"
+            curl -sS -A "$UA" -o body.html -D headers.txt -w 'status=%{http_code} size=%{size_download} final=%{url_effective}\n' "$url" || true
+            head -20 headers.txt
+            grep -o '<title[^<]*</title>' body.html | head -1 || true
+            sed -e 's/<[^>]*>//g' body.html | grep -v '^\s*$' | head -15
+            sleep 3
+          done
