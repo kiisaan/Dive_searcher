@@ -48,15 +48,16 @@ def should_notify(sale: dict) -> bool:
 SEPARATOR = "-------------------------------"
 
 
-def build_sections(sales: list[dict]) -> list[str]:
-    """発売時刻（時・分）ごとに「イベント名:」「URL:」の2行セットを空行区切りで並べたブロックを作る。"""
+def build_messages(sales: list[dict]) -> list[str]:
+    """発売時刻（時・分）の見出しと、1イベント1通の「イベント名:」「URL:」を並べる。"""
     by_time: dict[str, dict[str, str]] = {}
     for s in sorted(sales, key=lambda s: (s["start"], s["title"])):
         by_time.setdefault(f"{s['start']:%H時%M分}", {}).setdefault(s["url"], s["title"])
-    return [
-        f"{label}\n" + "\n\n".join(f"イベント名:{title}\nURL:{url}" for url, title in events.items())
-        for label, events in by_time.items()
-    ]
+    messages = []
+    for i, (label, events) in enumerate(by_time.items()):
+        messages.append(label if i == 0 else f"{SEPARATOR}\n{label}")
+        messages.extend(f"イベント名:{title}\nURL:{url}" for url, title in events.items())
+    return messages
 
 
 def main() -> int:
@@ -73,22 +74,24 @@ def main() -> int:
         except Exception as e:  # 片方のサイトが落ちても他方は通知する
             errors.append(f"{name}: {e!r}")
 
-    sections = build_sections([s for s in sales if should_notify(s)])
-    header = f"{today:%m/%d}チケットダイブのチケ発\n"
+    messages = build_messages([s for s in sales if should_notify(s)])
+    title = f"{today:%m/%d}チケットダイブのチケ発"
+    count = sum(1 for m in messages if m.startswith("イベント名:"))
+    header = f"{title}\n\n先着販売 {count}件"
     if errors:
         header += "\n⚠️ 取得に失敗しました: " + " / ".join(errors)
-    if not sections:
+    if not messages:
         header += "\n本日発売の先着チケットは見つかりませんでした。"
 
     if dry_run:
-        print(discord.join(header, sections, SEPARATOR))
+        print("\n\n".join([header, *messages]))
     else:
         send_at = datetime.now(JST).replace(hour=SEND_AT[0], minute=SEND_AT[1], second=0, microsecond=0)
         wait = (send_at - datetime.now(JST)).total_seconds()
         if 0 < wait < 6 * 3600:
             time.sleep(wait)
-        discord.send(webhook_url, header, sections, SEPARATOR)
-    return 1 if errors and not sections else 0
+        discord.send_forum_post(webhook_url, title, [header, *messages])
+    return 1 if errors and not messages else 0
 
 
 if __name__ == "__main__":

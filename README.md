@@ -6,23 +6,28 @@
 - `EXCLUDE_KEYWORDS`: イベント名・受付名のどちらかに含むと除外（当日券、撮影会、トークショー、オフ会 など）
 - `EXCLUDE_TITLE_KEYWORDS`: イベント名に含むと除外（事前予約）
 
+Discord のフォーラムチャンネルに、毎日「MM/DDチケットダイブのチケ発」という投稿を作り、
+その中に発売時刻の見出しと **1イベント1メッセージ** を送ります。
+スマホでもメッセージを長押し →「テキストをコピー」で、そのイベントだけをコピーできます。
+
 ```
-10/28チケットダイブのチケ発
+10/29チケットダイブのチケ発
 
+先着販売 46件
+```
+```
 20時00分
+```
+```
 イベント名:○○
 URL:https://ticketdive.com/event/...
-
-イベント名:○○
-URL:https://ticketdive.com/event/...
-
+```
+```
 -------------------------------
 21時15分
-イベント名:○○
-URL:https://ticketdive.com/event/...
 ```
 
-2000 文字を超える場合は発売時刻の区切りで複数メッセージに分けて送ります。
+Webhook が通常のテキストチャンネルのものでも、投稿を作らずにチャンネルへ同じ内容を送ります。
 
 | サイト | 状態 |
 | --- | --- |
@@ -31,7 +36,7 @@ URL:https://ticketdive.com/event/...
 
 ## セットアップ
 
-1. Discord のチャンネル設定 → 連携サービス → ウェブフック で Webhook URL を作成
+1. Discord でフォーラムチャンネルを作り、そのチャンネルの設定 → 連携サービス → ウェブフック で Webhook URL を作成
 2. このリポジトリの Settings → Secrets and variables → Actions → New repository secret
    - Name: `DISCORD_WEBHOOK_URL`
    - Secret: 1 の URL
