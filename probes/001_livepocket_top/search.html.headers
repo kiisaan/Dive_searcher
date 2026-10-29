@@ -1,0 +1,15 @@
+Content-Type: text/html
+Content-Length: 22229
+Connection: close
+Accept-Ranges: bytes
+Server: AmazonS3
+Last-Modified: Wed, 05 Apr 2023 11:50:38 GMT
+x-amz-server-side-encryption: AES256
+Date: Thu, 29 Oct 2026 12:22:22 GMT
+ETag: "666b662e93cf4f93d218de69c0a07125"
+X-Cache: Hit from cloudfront
+Via: 1.1 7d44026d7ff362d1ff72f45321060092.cloudfront.net (CloudFront)
+X-Amz-Cf-Pop: NRT12-P1
+X-Amz-Cf-Id: jwox_Ie2GF1qJfw94oj5Fk-RlNe0s7IH-IvFXwbw5rw7UOPrrPXTyA==
+Age: 6
+
