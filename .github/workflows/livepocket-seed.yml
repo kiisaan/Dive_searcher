@@ -47,7 +47,7 @@ jobs:
           key: state-livepocket-${{ github.run_id }}
           restore-keys: state-livepocket-
       - name: 収集（Discord には送らない）
-        run: python main.py livepocket --dry-run
+        run: python main.py collect livepocket /tmp/seed.json
       - name: 受付情報キャッシュを保存
         if: always()
         uses: actions/cache/save@v4

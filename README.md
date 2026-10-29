@@ -6,17 +6,23 @@
 - `EXCLUDE_KEYWORDS`: イベント名・受付名のどちらかに含むと除外（当日券、撮影会、トークショー、オフ会 など）
 - `EXCLUDE_TITLE_KEYWORDS`: イベント名に含むと除外（事前予約）
 
-Discord のフォーラムチャンネルに、毎日サイトごとに「MM/DDチケットダイブのチケ発」「MM/DDライブポケットのチケ発」という投稿を作り、
-その中に発売時刻の見出しと **1イベント1メッセージ** を送ります。
+Discord のフォーラムチャンネルに、毎日「MM/DD 本日のチケ発情報」という投稿を 1 つ作り、
+発売時刻ごと・プレイガイドごとに **1イベント1メッセージ** で並べます。
 スマホでもメッセージを長押し →「テキストをコピー」で、そのイベントだけをコピーできます。
 
 ```
-10/29チケットダイブのチケ発
-
-先着販売 46件
+10/30 本日のチケ発情報
 ```
 ```
-20時00分
+10時00分
+ライブポケット
+```
+```
+イベント名:○○
+URL:https://livepocket.jp/e/...
+```
+```
+チケットダイブ
 ```
 ```
 イベント名:○○
@@ -25,6 +31,7 @@ URL:https://ticketdive.com/event/...
 ```
 -------------------------------
 21時15分
+チケットダイブ
 ```
 
 Webhook が通常のテキストチャンネルのものでも、投稿を作らずにチャンネルへ同じ内容を送ります。
@@ -46,15 +53,17 @@ Webhook が通常のテキストチャンネルのものでも、投稿を作ら
 ## ローカルで試す
 
 ```bash
-python main.py ticketdive --dry-run
-python main.py livepocket --dry-run
+python main.py collect livepocket lp.json
+python main.py collect ticketdive td.json
+python main.py send --dry-run lp.json td.json
 ```
 
-`--dry-run` を付けるか `DISCORD_WEBHOOK_URL` が未設定なら、Discord には送らず標準出力に表示します。
+`send` に `--dry-run` を付けるか `DISCORD_WEBHOOK_URL` が未設定なら、Discord には送らず標準出力に表示します。
 
 ## 仕組み
 
-GitHub Actions で 5:07 JST に起動し、サイトごとに並行して 30〜90 分かけて収集したあと 8:00 JST まで待って送信します。
+GitHub Actions で 5:07 JST に起動し、サイトごとに並行して 30〜90 分かけて収集したあと、結果を 1 つにまとめて 8:00 JST に送信します。
+取得に失敗したサイトがあれば、投稿の先頭にその旨を表示します。
 GitHub のスケジュール実行は遅れることがあるため、前倒ししています。
 起動が 8:00 を過ぎた場合は、収集が終わり次第送信します。
 

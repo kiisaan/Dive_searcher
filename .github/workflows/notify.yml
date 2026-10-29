@@ -9,8 +9,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  notify:
-    # サイトごとに並行して動かし、それぞれフォーラムに投稿する
+  # サイトごとに並行して集める
+  collect:
     strategy:
       fail-fast: false
       matrix:
@@ -32,13 +32,39 @@ jobs:
           path: state
           key: state-${{ matrix.source }}-${{ github.run_id }}
           restore-keys: state-${{ matrix.source }}-
-      - name: 通知
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python main.py ${{ matrix.source }}
+      - name: 収集
+        run: python main.py collect ${{ matrix.source }} result-${{ matrix.source }}.json
       - name: 受付情報キャッシュを保存
         if: always()
         uses: actions/cache/save@v4
         with:
           path: state
           key: state-${{ matrix.source }}-${{ github.run_id }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: result-${{ matrix.source }}
+          path: result-${{ matrix.source }}.json
+          retention-days: 7
+
+  # 集めた結果を 1 つの投稿にまとめ、8:00 JST に送る（どちらかのサイトが失敗しても送る）
+  send:
+    needs: collect
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: result-*
+          merge-multiple: true
+          path: results
+        continue-on-error: true
+      - name: 送信
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python main.py send results/*.json
