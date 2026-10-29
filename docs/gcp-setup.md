@@ -28,18 +28,20 @@ Google Cloud の東京リージョン（Cloud Run ジョブ）で動かします
 ブラウザ上で動くターミナル（Cloud Shell）を使います。パソコンに何かを入れる必要はありません。
 
 1. 画面右上の **「>_」アイコン（Cloud Shell をアクティブにする）** を押す
-2. 画面下に黒い画面が開いたら、次の 2 行を貼り付けて Enter（`<プロジェクトID>` は 1 で控えた ID に置き換え）
+2. 画面下に黒い画面が開いたら、プロンプトの `(...)` 内が 1 で作ったプロジェクト ID になっていることを確認
+   - 違う場合は `gcloud config set project プロジェクトID` を実行（プロジェクトID は 1 で控えたものに置き換え）
+3. 次の 2 行をそのまま貼り付けて Enter（いま選ばれているプロジェクトに設定されます）
    ```bash
    curl -sSLO https://raw.githubusercontent.com/kiisaan/Dive_searcher/main/gcp/setup.sh
-   bash setup.sh <プロジェクトID>
+   bash setup.sh "$(gcloud config get-value project)"
    ```
    - 途中で「承認」を求められたら **承認** を押す
-3. 最後に表示される 3 つの値を控える
+4. 最後に表示される 3 つの値を控える
 
 ## 4. GitHub に 3 つの値を登録する
 
 1. https://github.com/kiisaan/Dive_searcher/settings/variables/actions を開く
-2. **Variables** タブ → **New repository variable** で、3 で表示された次の 3 つを登録
+2. **Variables** タブ → **New repository variable** で、3 の最後に表示された次の 3 つを登録
    - `GCP_PROJECT_ID`
    - `GCP_WIF_PROVIDER`
    - `GCP_SA_EMAIL`
