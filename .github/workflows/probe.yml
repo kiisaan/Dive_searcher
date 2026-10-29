@@ -1,0 +1,90 @@
+name: 東京で調査用スクリプトを実行
+
+# probes/*.py を main に追加・変更すると、Google Cloud（東京リージョン）の Cloud Run ジョブで実行し、
+# 結果を probe-results ブランチに書き戻す。ライブポケットが日本国外からのアクセスを受け付けないため。
+on:
+  push:
+    branches: [main]
+    paths: ["probes/*.py"]
+  workflow_dispatch:
+    inputs:
+      probe:
+        description: "実行する調査（probes/ のファイル名、拡張子なし）"
+        required: true
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  REGION: asia-northeast1
+  JOB: dive-tokyo
+
+jobs:
+  probe:
+    # Google Cloud の設定（gcp/setup.sh）が済むまでは何もしない
+    if: vars.GCP_PROJECT_ID != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 実行する調査を決める
+        id: targets
+        run: |
+          if [ -n "${{ inputs.probe }}" ]; then
+            names="${{ inputs.probe }}"
+          else
+            names=$(git diff --name-only --diff-filter=AM "${{ github.event.before }}" "${{ github.sha }}" -- 'probes/*.py' \
+              | xargs -r -n1 basename | sed 's/\.py$//')
+          fi
+          echo "names=$(echo $names)" >> "$GITHUB_OUTPUT"
+          echo "実行する調査: $names"
+
+      - name: 結果用ブランチを用意
+        run: |
+          if ! git ls-remote --exit-code origin probe-results >/dev/null; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git checkout --orphan probe-results
+            git rm -rfq .
+            git commit --allow-empty -qm "調査結果用ブランチ"
+            git push -q origin probe-results
+            git checkout -q "${{ github.sha }}"
+          fi
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Cloud Run ジョブを作成・更新
+        run: |
+          gcloud run jobs deploy "$JOB" --region "$REGION" \
+            --image docker.io/library/python:3.12-slim \
+            --service-account "dive-runner@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com" \
+            --cpu 1 --memory 512Mi --task-timeout 30m --max-retries 0 \
+            --command python3 --args "^@^-c@$(cat gcp/bootstrap.py)"
+
+      - name: 東京で実行
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for name in ${{ steps.targets.outputs.names }}; do
+            echo "::group::$name"
+            gcloud run jobs execute "$JOB" --region "$REGION" --wait \
+              --update-env-vars "^@^REF=${{ github.sha }}@TASK=probe:$name@GITHUB_TOKEN=$GITHUB_TOKEN" \
+              || echo "::warning::$name が失敗しました"
+            echo "::endgroup::"
+          done
+
+      - name: ジョブのログを表示
+        if: always()
+        run: |
+          gcloud logging read \
+            "resource.type=\"cloud_run_job\" AND resource.labels.job_name=\"$JOB\" AND timestamp>=\"$(date -u -d '-1 hour' +%FT%TZ)\"" \
+            --order=asc --format='value(textPayload)' --limit=500
