@@ -1,0 +1,4 @@
+# 001_livepocket_top (REF a770f98)
+https://t.livepocket.jp/robots.txt -> 200 22229B final=https://t.livepocket.jp/sorry/403.html
+https://t.livepocket.jp/ -> 200 22229B final=https://t.livepocket.jp/sorry/403.html
+https://t.livepocket.jp/event/search -> 200 22229B final=https://t.livepocket.jp/sorry/403.html
