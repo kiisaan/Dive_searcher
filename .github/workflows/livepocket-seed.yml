@@ -47,6 +47,9 @@ jobs:
           key: state-livepocket-${{ github.run_id }}
           restore-keys: state-livepocket-
       - name: 収集（Discord には送らない）
+        env:
+          # 通常の 2 倍。2 回動けば約 9,000 件の受付情報がそろう
+          LIVEPOCKET_MAX_DETAILS: "5000"
         run: python main.py collect livepocket /tmp/seed.json
       - name: 受付情報キャッシュを保存
         if: always()

@@ -8,6 +8,7 @@
 import html
 import http.client
 import json
+import os
 import re
 import urllib.error
 from datetime import date, datetime, timedelta, timezone
@@ -19,8 +20,9 @@ BASE = "https://livepocket.jp"
 JST = timezone(timedelta(hours=9))
 # 一覧ページ数の上限（安全のため。通常は 450 ページ前後で終わる）
 MAX_LIST_PAGES = 800
-# 1 回の実行で取得する詳細ページ数の上限。初回は数日かけて全イベントの受付情報がそろう
-MAX_DETAIL_FETCHES = 2500
+# 1 回の実行で取得する詳細ページ数の上限（環境変数 LIVEPOCKET_MAX_DETAILS で変更可）。
+# 受付情報がそろっていない初回は、事前収集で上限を上げて何度か回す
+MAX_DETAIL_FETCHES = int(os.environ.get("LIVEPOCKET_MAX_DETAILS", "2500"))
 # 受付情報を使い回す期間
 TTL_BEFORE_SALE = timedelta(days=3)
 TTL_DEFAULT = timedelta(days=7)
