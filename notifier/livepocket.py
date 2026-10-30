@@ -2,6 +2,7 @@ import asyncio
 import html
 import json
 import os
+import random
 import re
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -14,7 +15,7 @@ MAX_DETAIL_FETCHES = int(os.environ.get("LIVEPOCKET_MAX_DETAILS", "2500"))
 TTL_BEFORE_SALE = timedelta(days=3)
 TTL_DEFAULT = timedelta(days=7)
 
-# 成功実績のあるブロック設定
+# ブロック回避のための不要リソース遮断設定
 BLOCK_RESOURCE_TYPES = {"image", "media", "font"}
 BLOCK_URL_KEYWORDS = (
     "googletagmanager.com", "google-analytics.com", "doubleclick.net", "googlesyndication.com",
@@ -123,15 +124,25 @@ async def _async_collect(target: date, cache_path: Path | None = None) -> list[d
         await context.route("**/*", _route_handler)
         page = await context.new_page()
 
-        # 1. 一覧ページを全巡回（WAF対策としてランダムな待機やUser-Agentの安定化を強化）
+        # 1. 全イベントの一覧ページを順次巡回（ヒューマン・ディレイ＆リトライ付き）
         for page_num in range(1, MAX_LIST_PAGES + 1):
             url = f"{BASE}/event/search?sort=1&page={page_num}"
             try:
+                # 人間らしいランダムなウェイト（2秒〜4.5秒）を入れてボット判定を回避
+                if page_num > 1:
+                    await asyncio.sleep(random.uniform(2.0, 4.5))
+
                 response = await page.goto(url, wait_until="domcontentloaded", timeout=40000)
+                
+                # 202（ブロック等）が返ってきた場合のセーフティリトライ
                 if not response or response.status != 200:
                     status = response.status if response else "No Response"
-                    print(f"[LivePocket] ステータス {status} (ページ {page_num})")
-                    break
+                    print(f"[LivePocket] ステータス {status} (ページ {page_num}) - 再試行します...")
+                    await asyncio.sleep(5.0)
+                    response = await page.goto(url, wait_until="domcontentloaded", timeout=40000)
+                    if not response or response.status != 200:
+                        print(f"[LivePocket] ページ {page_num} の取得に失敗したため巡回を終了します。")
+                        break
                 
                 try:
                     await page.wait_for_selector(".event-card-list__item", timeout=10000)
@@ -141,16 +152,15 @@ async def _async_collect(target: date, cache_path: Path | None = None) -> list[d
                 html_content = await page.content()
                 cards = _parse_cards(html_content)
                 if not cards:
-                    print(f"[LivePocket] ページ {page_num}: カードが0件のため終了します")
+                    print(f"[LivePocket] ページ {page_num}: カードが0件のため全件取得完了とみなします。")
                     break
                 
                 for card in cards:
                     events[card["path"]] = card
                 
-                if page_num % 10 == 0:
-                    print(f"[LivePocket] 一覧 {page_num}ページ / {len(events)}件", flush=True)
+                if page_num % 5 == 0 or page_num == 1:
+                    print(f"[LivePocket] 一覧 {page_num}ページ完了 / 累計 {len(events)}件", flush=True)
                 
-                await asyncio.sleep(1.0)  # サーバーに負荷をかけすぎないよう少しウェイトを入れる
             except Exception as e:
                 print(f"[LivePocket] エラー (ページ {page_num}): {e}")
                 break
@@ -167,15 +177,15 @@ async def _async_collect(target: date, cache_path: Path | None = None) -> list[d
         fetched = 0
         for _, path in queue[:MAX_DETAIL_FETCHES]:
             try:
+                # 詳細ページ閲覧時も少しウェイトを入れる
+                await asyncio.sleep(random.uniform(1.0, 2.0))
                 await page.goto(BASE + path, wait_until="domcontentloaded", timeout=20000)
-                await page.wait_for_timeout(800)
                 detail_html = await page.content()
                 tickets = _parse_tickets(detail_html)
                 cache[path] = {"fetched": now.isoformat(), "tags": events[path]["tags"], "tickets": tickets}
                 fetched += 1
-                if fetched % 200 == 0:
+                if fetched % 50 == 0:
                     print(f"[LivePocket] 詳細ページ {fetched}/{min(len(queue), MAX_DETAIL_FETCHES)}件取得", flush=True)
-                await asyncio.sleep(0.5)
             except (OSError, Exception):
                 continue
 
