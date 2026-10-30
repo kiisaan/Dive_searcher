@@ -92,10 +92,26 @@ async def _async_collect(target: date, cache_path: Path | None = None) -> list[d
     events = {}
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        # ボット検知（ステータス202など）を回避するためのブラウザ起動設定
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+            ],
         )
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            locale="ja-JP",
+            timezone_id="Asia/Tokyo",
+            viewport={"width": 1280, "height": 800},
+        )
+        
+        # 自動化フラグを隠蔽
+        await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        
         page = await context.new_page()
 
         # 1. 一覧ページを全巡回
@@ -107,7 +123,6 @@ async def _async_collect(target: date, cache_path: Path | None = None) -> list[d
                     print(f"[LivePocket] ステータス {response.status} (ページ {page_num})")
                     break
                 
-                # 要素の待機に失敗しても強制終了せず、そのままHTML取得へ進む
                 try:
                     await page.wait_for_selector(".event-card-list__item", timeout=10000)
                 except Exception:
@@ -125,7 +140,7 @@ async def _async_collect(target: date, cache_path: Path | None = None) -> list[d
                 if page_num % 10 == 0:
                     print(f"[LivePocket] 一覧 {page_num}ページ / {len(events)}件", flush=True)
                 
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(1)
             except Exception as e:
                 print(f"[LivePocket] エラー (ページ {page_num}): {e}")
                 break
