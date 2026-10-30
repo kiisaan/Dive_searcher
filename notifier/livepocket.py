@@ -104,30 +104,33 @@ async def _async_collect(target: date, cache_path: Path | None = None) -> list[d
             try:
                 response = await page.goto(url, wait_until="domcontentloaded", timeout=30000)
                 if response.status != 200:
+                    print(f"[LivePocket] ステータス {response.status} (ページ {page_num})")
                     break
                 
+                # 要素の待機に失敗しても強制終了せず、そのままHTML取得へ進む
                 try:
                     await page.wait_for_selector(".event-card-list__item", timeout=10000)
                 except Exception:
-                    break
+                    print(f"[LivePocket] ページ {page_num}: セレクタ待機タイムアウト（HTML直読み込み）")
 
                 html_content = await page.content()
                 cards = _parse_cards(html_content)
                 if not cards:
-                    if page_num == 1:
-                        raise RuntimeError("LivePocket の検索結果を取得できませんでした")
+                    print(f"[LivePocket] ページ {page_num}: カードが0件のため終了します")
                     break
+                
                 for card in cards:
                     events[card["path"]] = card
-                if page_num % 50 == 0:
+                
+                if page_num % 10 == 0:
                     print(f"[LivePocket] 一覧 {page_num}ページ / {len(events)}件", flush=True)
+                
                 await asyncio.sleep(0.5)
             except Exception as e:
-                if page_num == 1:
-                    raise RuntimeError(f"LivePocket の検索結果を取得できませんでした: {e}")
+                print(f"[LivePocket] エラー (ページ {page_num}): {e}")
                 break
 
-        print(f"[LivePocket] 一覧から {len(events)}件", flush=True)
+        print(f"[LivePocket] 一覧から合計 {len(events)}件を取得", flush=True)
 
         # 2. 優先度をつけて詳細ページを取得
         queue = sorted(
