@@ -12,7 +12,9 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from notifier import discord, livepocket, ticketdive
+import importlib
+
+from notifier import discord
 
 JST = timezone(timedelta(hours=9))
 # 収集に時間がかかるので早めに起動し、この時刻まで待ってから送信する
@@ -53,10 +55,15 @@ def should_notify(sale: dict) -> bool:
 
 SEPARATOR = "-------------------------------"
 
+def _collector(module: str):
+    """サイトのコードは収集するときだけ読み込む。1 サイトのコードの不具合で他サイトや送信が止まらないようにするため"""
+    return lambda d: importlib.import_module(f"notifier.{module}").collect(d, cache_path=STATE_DIR / f"{module}.json")
+
+
 # サイト: 名前 → (表示名, 収集関数)。投稿の中ではこの順に並べる
 SOURCES = {
-    "livepocket": ("ライブポケット", lambda d: livepocket.collect(d, cache_path=STATE_DIR / "livepocket.json")),
-    "ticketdive": ("チケットダイブ", lambda d: ticketdive.collect(d, cache_path=STATE_DIR / "ticketdive.json")),
+    "livepocket": ("ライブポケット", _collector("livepocket")),
+    "ticketdive": ("チケットダイブ", _collector("ticketdive")),
 }
 
 
