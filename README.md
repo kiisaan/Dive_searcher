@@ -62,10 +62,17 @@ python main.py send --dry-run lp.json td.json
 
 ## 仕組み
 
-GitHub Actions で 5:07 JST に起動し、サイトごとに並行して 30〜90 分かけて収集したあと、結果を 1 つにまとめて 8:00 JST に送信します。
+毎朝 6:30 JST に cron-job.org から GitHub API（workflow_dispatch）でワークフローを起動し、
+サイトごとに並行して 30〜90 分かけて収集したあと、結果を 1 つにまとめて 8:00 JST に送信します。
 取得に失敗したサイトがあれば、投稿の先頭にその旨を表示します。
-GitHub のスケジュール実行は遅れることがあるため、前倒ししています。
+GitHub のスケジュール実行はこの時間帯に 4 時間近く遅れることが続いたため使っていません。
 起動が 8:00 を過ぎた場合は、収集が終わり次第送信します。
+
+cron-job.org の設定:
+- URL: `https://api.github.com/repos/kiisaan/Dive_searcher/actions/workflows/notify.yml/dispatches`（POST、毎日 6:30 Asia/Tokyo）
+- Headers: `Authorization: Bearer <トークン>`、`Accept: application/vnd.github+json`、`Content-Type: application/json`
+- Body: `{"ref":"main"}`
+- トークン: このリポジトリの Actions: Read and write だけを持つ fine-grained token（期限が来たら作り直して差し替える）
 
 ### TicketDive
 TicketDive には全イベント一覧がなく、検索は 1 回最大 20 件・並び順固定・ページ送りなしです。
