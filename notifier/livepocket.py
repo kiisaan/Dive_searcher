@@ -4,7 +4,8 @@ import os
 import re
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-import httpx
+import urllib.request
+import urllib.error
 
 BASE = "https://livepocket.jp"
 JST = timezone(timedelta(hours=9))
@@ -90,61 +91,62 @@ def _refresh_priority(cached: dict | None, card: dict, now: datetime, today: dat
     return None
 
 
+def _fetch_url(url: str) -> str | None:
+    req = urllib.request.Request(url, headers=HEADERS)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            if response.status == 200:
+                return response.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        print(f"[LivePocket] ステータス {e.code} ({url})")
+    except Exception as e:
+        print(f"[LivePocket] 通信エラー ({url}): {e}")
+    return None
+
+
 def collect(target: date, cache_path: Path | None = None) -> list[dict]:
     """main.py から同期関数として呼び出されるエントリーポイント"""
     now = datetime.now(JST)
     cache = _load_cache(cache_path)
     events = {}
 
-    with httpx.Client(headers=HEADERS, timeout=30.0, follow_redirects=True) as client:
-        # 1. 一覧ページを全巡回
-        for page_num in range(1, MAX_LIST_PAGES + 1):
-            url = f"{BASE}/event/search?sort=1&page={page_num}"
-            try:
-                response = client.get(url)
-                if response.status_code != 200:
-                    print(f"[LivePocket] ステータス {response.status_code} (ページ {page_num})")
-                    break
-
-                html_content = response.text
-                cards = _parse_cards(html_content)
-                if not cards:
-                    print(f"[LivePocket] ページ {page_num}: カードが0件のため終了します")
-                    break
-                
-                for card in cards:
-                    events[card["path"]] = card
-                
-                if page_num % 10 == 0:
-                    print(f"[LivePocket] 一覧 {page_num}ページ / {len(events)}件", flush=True)
-                
-            except Exception as e:
-                print(f"[LivePocket] エラー (ページ {page_num}): {e}")
-                break
-
-        print(f"[LivePocket] 一覧から合計 {len(events)}件を取得", flush=True)
-
-        # 2. 優先度をつけて詳細ページを取得
-        queue = sorted(
-            (priority, path)
-            for path, card in events.items()
-            if (priority := _refresh_priority(cache.get(path), card, now, target)) is not None
-        )
+    # 1. 一覧ページを全巡回
+    for page_num in range(1, MAX_LIST_PAGES + 1):
+        url = f"{BASE}/event/search?sort=1&page={page_num}"
+        html_content = _fetch_url(url)
+        if not html_content:
+            break
         
-        fetched = 0
-        for _, path in queue[:MAX_DETAIL_FETCHES]:
-            try:
-                response = client.get(BASE + path)
-                if response.status_code != 200:
-                    continue
-                detail_html = response.text
-                tickets = _parse_tickets(detail_html)
-                cache[path] = {"fetched": now.isoformat(), "tags": events[path]["tags"], "tickets": tickets}
-                fetched += 1
-                if fetched % 200 == 0:
-                    print(f"[LivePocket] 詳細ページ {fetched}/{min(len(queue), MAX_DETAIL_FETCHES)}件取得", flush=True)
-            except Exception:
-                continue
+        cards = _parse_cards(html_content)
+        if not cards:
+            print(f"[LivePocket] ページ {page_num}: カードが0件のため終了します")
+            break
+        
+        for card in cards:
+            events[card["path"]] = card
+        
+        if page_num % 10 == 0:
+            print(f"[LivePocket] 一覧 {page_num}ページ / {len(events)}件", flush=True)
+
+    print(f"[LivePocket] 一覧から合計 {len(events)}件を取得", flush=True)
+
+    # 2. 優先度をつけて詳細ページを取得
+    queue = sorted(
+        (priority, path)
+        for path, card in events.items()
+        if (priority := _refresh_priority(cache.get(path), card, now, target)) is not None
+    )
+    
+    fetched = 0
+    for _, path in queue[:MAX_DETAIL_FETCHES]:
+        detail_html = _fetch_url(BASE + path)
+        if not detail_html:
+            continue
+        tickets = _parse_tickets(detail_html)
+        cache[path] = {"fetched": now.isoformat(), "tags": events[path]["tags"], "tickets": tickets}
+        fetched += 1
+        if fetched % 200 == 0:
+            print(f"[LivePocket] 詳細ページ {fetched}/{min(len(queue), MAX_DETAIL_FETCHES)}件取得", flush=True)
 
     # 3. 指定日のセール情報を抽出
     sales = []
