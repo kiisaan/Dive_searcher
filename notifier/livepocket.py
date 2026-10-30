@@ -1,6 +1,7 @@
 import asyncio
 import html
 import json
+import os
 import re
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -104,7 +105,12 @@ async def _async_collect(target: date, cache_path: Path | None = None) -> list[d
                 response = await page.goto(url, wait_until="domcontentloaded", timeout=30000)
                 if response.status != 200:
                     break
-                await page.wait_for_selector(".event-card-list__item", timeout=15000)
+                
+                try:
+                    await page.wait_for_selector(".event-card-list__item", timeout=10000)
+                except Exception:
+                    break
+
                 html_content = await page.content()
                 cards = _parse_cards(html_content)
                 if not cards:
