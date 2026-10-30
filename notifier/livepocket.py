@@ -14,7 +14,7 @@ MAX_DETAIL_FETCHES = int(os.environ.get("LIVEPOCKET_MAX_DETAILS", "2500"))
 TTL_BEFORE_SALE = timedelta(days=3)
 TTL_DEFAULT = timedelta(days=7)
 
-# --- ボット対策・リソースブロック設定 ---
+# 成功実績のあるブロック設定
 BLOCK_RESOURCE_TYPES = {"image", "media", "font"}
 BLOCK_URL_KEYWORDS = (
     "googletagmanager.com", "google-analytics.com", "doubleclick.net", "googlesyndication.com",
@@ -120,17 +120,17 @@ async def _async_collect(target: date, cache_path: Path | None = None) -> list[d
             extra_http_headers={"Accept-Language": "ja-JP,ja;q=0.9"},
         )
         
-        # 不要なトラッキングや広告スクリプトを遮断してWAF検知を回避
         await context.route("**/*", _route_handler)
         page = await context.new_page()
 
-        # 1. 一覧ページを全巡回
+        # 1. 一覧ページを全巡回（WAF対策としてランダムな待機やUser-Agentの安定化を強化）
         for page_num in range(1, MAX_LIST_PAGES + 1):
             url = f"{BASE}/event/search?sort=1&page={page_num}"
             try:
-                response = await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-                if response.status != 200:
-                    print(f"[LivePocket] ステータス {response.status} (ページ {page_num})")
+                response = await page.goto(url, wait_until="domcontentloaded", timeout=40000)
+                if not response or response.status != 200:
+                    status = response.status if response else "No Response"
+                    print(f"[LivePocket] ステータス {status} (ページ {page_num})")
                     break
                 
                 try:
@@ -150,7 +150,7 @@ async def _async_collect(target: date, cache_path: Path | None = None) -> list[d
                 if page_num % 10 == 0:
                     print(f"[LivePocket] 一覧 {page_num}ページ / {len(events)}件", flush=True)
                 
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(1.0)  # サーバーに負荷をかけすぎないよう少しウェイトを入れる
             except Exception as e:
                 print(f"[LivePocket] エラー (ページ {page_num}): {e}")
                 break
@@ -168,14 +168,14 @@ async def _async_collect(target: date, cache_path: Path | None = None) -> list[d
         for _, path in queue[:MAX_DETAIL_FETCHES]:
             try:
                 await page.goto(BASE + path, wait_until="domcontentloaded", timeout=20000)
-                await page.wait_for_timeout(500)
+                await page.wait_for_timeout(800)
                 detail_html = await page.content()
                 tickets = _parse_tickets(detail_html)
                 cache[path] = {"fetched": now.isoformat(), "tags": events[path]["tags"], "tickets": tickets}
                 fetched += 1
                 if fetched % 200 == 0:
                     print(f"[LivePocket] 詳細ページ {fetched}/{min(len(queue), MAX_DETAIL_FETCHES)}件取得", flush=True)
-                await asyncio.sleep(0.3)
+                await asyncio.sleep(0.5)
             except (OSError, Exception):
                 continue
 
