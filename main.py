@@ -70,7 +70,8 @@ def build_messages(sales: list[dict]) -> list[str]:
     for i, (label, by_source) in enumerate(by_time.items()):
         heading = label if i == 0 else f"{SEPARATOR}\n{label}"
         for j, (source, events) in enumerate(by_source.items()):
-            name = SOURCES[source][0]
+            # イベント名と見分けやすいよう、プレイガイド名は Discord の見出しにする
+            name = f"### 【{SOURCES[source][0]}】"
             messages.append(f"{heading}\n{name}" if j == 0 else name)
             messages.extend(f"イベント名:{title}\nURL:{url}" for url, title in events.items())
     return messages
