@@ -97,5 +97,5 @@ TicketDive には全イベント一覧がなく、検索は 1 回最大 20 件�
   今日明日に受付が始まるもの・保存から日数が経ったもの（販売前は 3 日、それ以外は 7 日）
 - 1 回の詳細ページ取得は最大 2,500 件。イベントが約 9,000 件あるため、初回から数日は受付情報がそろわず取りこぼしがあります
 
-GitHub Actions（米国の Azure）からは AWS WAF のボット確認（HTTP 202・`x-amzn-waf-action: challenge`）がかかって取得できないため、
-Google Cloud（東京）から取得できるか確認中です。設定手順は [docs/gcp-setup.md](docs/gcp-setup.md)。
+GitHub Actions（米国の Azure）からは AWS WAF のボット確認（HTTP 202・`x-amzn-waf-action: challenge`）がかかって取得できず、
+現在は「取得に失敗しました」と表示されます。`notifier/livepocket.py` の `collect` は別途差し替え予定です。
